@@ -5,18 +5,49 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collector;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 public final class CollectionUtils {
+
+    @Nonnull
+    public static <T, S extends Collection<Optional<T>>> Set<T> unpackPresentOptionalsToSet(
+        @Nullable final S collection) {
+
+        return unpackPresentOptionals(collection, toSet());
+    }
+
+
+    @Nonnull
+    public static <T, S extends Collection<Optional<T>>> List<T> unpackPresentOptionalsToList(
+        @Nullable final S collection) {
+
+        return unpackPresentOptionals(collection, toList());
+    }
+
+    @Nonnull
+    public static <T, S extends Collection<T>> S unpackPresentOptionals(
+        @Nullable final Collection<Optional<T>> collection,
+        @Nonnull final Collector<T, ?, S> collector) {
+
+        return emptyIfNull(collection).stream()
+                                      .filter(Optional::isPresent)
+                                      .map(Optional::get)
+                                      .collect(collector);
+    }
+
+
 
     /**
      * Create a new collection which contains only elements which satisfy {@code includeCondition} predicate.
