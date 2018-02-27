@@ -21,8 +21,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
+import static com.commercetools.sync.commons.utils.StreamUtils.unpackPresentOptionalsToList;
 import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
 final class SyncSingleLocale {
@@ -41,13 +41,10 @@ final class SyncSingleLocale {
         @Nonnull final ProductDraft newProductDraft,
         @Nonnull final Product oldProduct,
         @Nonnull final ProductType productType) {
-        return updateActions.stream()
-                            .map(action ->
-                                filterSingleLocalization(action, newProductDraft, oldProduct, productType,
-                                    Locale.FRENCH))
-                            .filter(Optional::isPresent)
-                            .map(Optional::get)
-                            .collect(toList());
+        return unpackPresentOptionalsToList(
+            updateActions.stream()
+                         .map(action -> filterSingleLocalization(action, newProductDraft, oldProduct, productType,
+                             Locale.FRENCH)));
     }
 
     /**

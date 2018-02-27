@@ -3,6 +3,7 @@ package com.commercetools.sync.services.impl;
 
 import com.commercetools.sync.categories.CategorySyncOptions;
 import com.commercetools.sync.commons.utils.CtpQueryUtils;
+import com.commercetools.sync.commons.utils.StreamUtils;
 import com.commercetools.sync.services.CategoryService;
 import io.sphere.sdk.categories.Category;
 import io.sphere.sdk.categories.CategoryDraft;
@@ -110,8 +111,7 @@ public final class CategoryServiceImpl extends BaseService<Category, CategoryDra
     @Override
     public CompletionStage<Set<Category>> createCategories(@Nonnull final Set<CategoryDraft> categoryDrafts) {
         return mapValuesToFutureOfCompletedValues(categoryDrafts, this::createCategory)
-            .thenApply(results -> results.filter(Optional::isPresent).map(Optional::get))
-            .thenApply(createdCategories -> createdCategories.collect(Collectors.toSet()));
+            .thenApply(StreamUtils::unpackPresentOptionalsToSet);
     }
 
     @Nonnull

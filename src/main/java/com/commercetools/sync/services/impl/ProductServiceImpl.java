@@ -1,6 +1,7 @@
 package com.commercetools.sync.services.impl;
 
 import com.commercetools.sync.commons.utils.CtpQueryUtils;
+import com.commercetools.sync.commons.utils.StreamUtils;
 import com.commercetools.sync.products.ProductSyncOptions;
 import com.commercetools.sync.services.ProductService;
 import io.sphere.sdk.commands.UpdateAction;
@@ -143,8 +144,7 @@ public class ProductServiceImpl extends BaseService<Product, ProductDraft> imple
     @Override
     public CompletionStage<Set<Product>> createProducts(@Nonnull final Set<ProductDraft> productsDrafts) {
         return mapValuesToFutureOfCompletedValues(productsDrafts, this::createProduct)
-            .thenApply(results -> results.filter(Optional::isPresent).map(Optional::get))
-            .thenApply(createdProducts -> createdProducts.collect(Collectors.toSet()));
+            .thenApply(StreamUtils::unpackPresentOptionalsToSet);
     }
 
     @Nonnull

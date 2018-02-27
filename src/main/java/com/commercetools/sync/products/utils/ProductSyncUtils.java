@@ -98,6 +98,7 @@ public final class ProductSyncUtils {
                                                                        attributesMetaData) {
         final SyncFilter syncFilter = syncOptions.getSyncFilter();
 
+        //TODO NEED TO USE UTILS HERE!
         final List<UpdateAction<Product>> updateActions = new ArrayList<>(buildUpdateActionsFromOptionals(Arrays.asList(
                 buildActionIfPassesFilter(syncFilter, ActionGroup.NAME, () ->
                     buildChangeNameUpdateAction(oldProduct, newProduct)),

@@ -9,10 +9,7 @@ import io.sphere.sdk.commands.UpdateAction;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.commercetools.sync.categories.utils.CategoryUpdateActionUtils.buildChangeNameUpdateAction;
 import static com.commercetools.sync.categories.utils.CategoryUpdateActionUtils.buildChangeOrderHintUpdateAction;
@@ -23,7 +20,9 @@ import static com.commercetools.sync.categories.utils.CategoryUpdateActionUtils.
 import static com.commercetools.sync.categories.utils.CategoryUpdateActionUtils.buildSetMetaDescriptionUpdateAction;
 import static com.commercetools.sync.categories.utils.CategoryUpdateActionUtils.buildSetMetaKeywordsUpdateAction;
 import static com.commercetools.sync.categories.utils.CategoryUpdateActionUtils.buildSetMetaTitleUpdateAction;
+import static com.commercetools.sync.commons.utils.CollectionUtils.unpackPresentOptionalsToList;
 import static com.commercetools.sync.commons.utils.CustomUpdateActionUtils.buildPrimaryResourceCustomUpdateActions;
+import static java.util.Arrays.asList;
 
 public final class CategorySyncUtils {
     private static final CategoryCustomActionBuilder categoryCustomActionBuilder =
@@ -76,7 +75,7 @@ public final class CategorySyncUtils {
     public static List<UpdateAction<Category>> buildCoreActions(@Nonnull final Category oldCategory,
                                                                 @Nonnull final CategoryDraft newCategory,
                                                                 @Nonnull final CategorySyncOptions syncOptions) {
-        final List<UpdateAction<Category>> updateActions = buildUpdateActionsFromOptionals(Arrays.asList(
+        final List<UpdateAction<Category>> updateActions = unpackPresentOptionalsToList(asList(
             buildChangeNameUpdateAction(oldCategory, newCategory),
             buildChangeSlugUpdateAction(oldCategory, newCategory),
             buildSetExternalIdUpdateAction(oldCategory, newCategory),
@@ -112,25 +111,6 @@ public final class CategorySyncUtils {
                                                                   @Nonnull final CategorySyncOptions syncOptions) {
 
         return new ArrayList<>();
-    }
-
-    /**
-     * Given a list of category {@link UpdateAction} elements, where each is wrapped in an {@link Optional}; this method
-     * filters out the optionals which are only present and returns a new list of category {@link UpdateAction}
-     * elements.
-     *
-     * @param optionalUpdateActions list of category {@link UpdateAction} elements,
-     *                              where each is wrapped in an {@link Optional}.
-     * @return a List of category update actions from the optionals that were present in the
-     * {@code optionalUpdateActions} list parameter.
-     */
-    @Nonnull
-    private static List<UpdateAction<Category>> buildUpdateActionsFromOptionals(
-        @Nonnull final List<Optional<UpdateAction<Category>>> optionalUpdateActions) {
-        return optionalUpdateActions.stream()
-                                    .filter(Optional::isPresent)
-                                    .map(Optional::get)
-                                    .collect(Collectors.toList());
     }
 
     private CategorySyncUtils() {
