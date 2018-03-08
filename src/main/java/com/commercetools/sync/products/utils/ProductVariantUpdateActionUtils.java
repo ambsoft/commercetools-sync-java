@@ -14,25 +14,32 @@ import io.sphere.sdk.products.attributes.AttributeDraft;
 import io.sphere.sdk.products.commands.updateactions.AddExternalImage;
 import io.sphere.sdk.products.commands.updateactions.MoveImageToPosition;
 import io.sphere.sdk.products.commands.updateactions.RemoveImage;
+import io.sphere.sdk.products.commands.updateactions.SetImageLabel;
 import io.sphere.sdk.products.commands.updateactions.SetPrices;
 import io.sphere.sdk.products.commands.updateactions.SetSku;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.commercetools.sync.commons.utils.CollectionUtils.emptyIfNull;
 import static com.commercetools.sync.commons.utils.CollectionUtils.filterCollection;
 import static com.commercetools.sync.commons.utils.CommonTypeUpdateActionUtils.buildUpdateAction;
 import static com.commercetools.sync.products.utils.ProductVariantAttributeUpdateActionUtils.buildProductVariantAttributeUpdateAction;
 import static java.lang.String.format;
+import static java.util.Collections.singletonList;
 import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.toCollection;
+import static java.util.stream.Collectors.toMap;
 
 // TODO: TESTS
 public final class ProductVariantUpdateActionUtils {
@@ -129,7 +136,7 @@ public final class ProductVariantUpdateActionUtils {
         final List<PriceDraft> newProductVariantPrices =
             newProductVariant.getPrices() == null ? new ArrayList<>() : newProductVariant.getPrices();
         final SetPrices setPricesUpdateAction = SetPrices.of(oldProductVariant.getId(), newProductVariantPrices);
-        return Collections.singletonList(setPricesUpdateAction);
+        return singletonList(setPricesUpdateAction);
     }
 
     /**
@@ -146,7 +153,7 @@ public final class ProductVariantUpdateActionUtils {
     @Nonnull
     public static List<UpdateAction<Product>> buildProductVariantImagesUpdateActions(
         @Nonnull final ProductVariant oldProductVariant,
-        @Nonnull final ProductVariantDraft newProductVariant) {
+        @Nonnull final ProductVariantDraft newProductVariant) throws BuildUpdateActionException {
         final List<UpdateAction<Product>> updateActions = new ArrayList<>();
         final Integer oldProductVariantId = oldProductVariant.getId();
         final List<Image> oldProductVariantImages = oldProductVariant.getImages();
@@ -170,6 +177,40 @@ public final class ProductVariantUpdateActionUtils {
                         updatedOldImages.remove(oldImage);
                     });
 
+            // Image set that has only the keys of the assets which should be removed, this is used in the method
+            // #buildChangeAssetOrderUpdateAction in order to compare the state of the asset lists after the remove actions
+            // have already been applied.
+            final HashSet<String> removedImageUrls = new HashSet<>();
+
+            final Map<String, Image> oldImagesUrlMap = oldProductVariantImages.stream().collect(toMap(Image::getUrl, image -> image));
+
+            final Map<String, Image> newImagesUrlMap;
+            try {
+                newImagesUrlMap =
+                    newProductVariantImages.stream().collect(
+                        toMap(Image::getUrl, image -> image, (imageA, imageB) -> {
+                            //TODO: FIX
+                                throw new IllegalStateException("Supplied images have duplicate urls. Asset keys are"
+                                    + " expected to be unique inside their container (a product variant or a categor");
+                            }
+                        ));
+            } catch (final IllegalStateException exception) {
+                throw new BuildUpdateActionException("");
+            }
+
+            // It is important to have a changeAssetOrder action before an addAsset action, since changeAssetOrder requires
+            // asset ids for sorting them, and new assets don't have ids yet since they are generated
+            // by CTP after an asset is created. Therefore, the order of update actions must be:
+            // removeAsset → changeAssetOrder → addAsset
+
+            //1. Remove or compare if matching.
+            updateActions.addAll(
+                buildRemoveImageOrImageUpdateActions(oldProductVariantId, oldProductVariantImages, removedImageUrls,
+                    newImagesUrlMap));
+
+            //2. Build Add external Image update actions
+            updateActions.addAll(buildAddExternalImageUpdateActions(oldProductVariantId, newImages, oldImagesUrlMap));
+
             filterCollection(newProductVariantImages, newVariantImage ->
                     !oldProductVariantImages.contains(newVariantImage))
                     .forEach(newImage -> {
@@ -181,6 +222,67 @@ public final class ProductVariantUpdateActionUtils {
         }
         return updateActions;
     }
+
+    // TODO: REUSE FROM ASSETS
+    @Nonnull
+    private static List<UpdateAction<Product>> buildRemoveImageOrImageUpdateActions(
+        @Nonnull final Integer variantId,
+        @Nonnull final List<Image> oldImages,
+        @Nonnull final Set<String> removedImageUrls,
+        @Nonnull final Map<String, Image> newImagesUrlMap) {
+
+        return oldImages
+            .stream()
+            .map(oldImage -> {
+                final String oldImageUrl = oldImage.getUrl();
+                final Image matchingNewImage = newImagesUrlMap.get(oldImageUrl);
+                return ofNullable(matchingNewImage)
+                    .map(newImage -> // If image exists, compare the two images.
+                        buildImageUpdateActions(oldImage, newImage))
+                    .orElseGet(() -> { // If image doesn't exist, remove asset.
+                        removedImageUrls.add(oldImageUrl);
+                        return singletonList(RemoveImage.ofVariantId(variantId, oldImage, true));
+                    });
+            })
+            .flatMap(Collection::stream)
+            .collect(toCollection(ArrayList::new));
+    }
+
+    // TODO: REUSE FROM ASSETS
+    @Nonnull
+    private static List<UpdateAction<Product>> buildAddExternalImageUpdateActions(
+        @Nonnull final Integer variantId,
+        @Nonnull final List<Image> newImages,
+        @Nonnull final Map<String, Image> oldImagesUrlMap) {
+
+        return newImages
+            .stream()
+            .map(newImage -> ofNullable(newImage.getUrl())
+                .filter(newImageUrl -> !oldImagesUrlMap.containsKey(newImageUrl))
+                .map(newImageUrl -> AddExternalImage.ofVariantId(variantId, newImage, true))
+            )
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .collect(toCollection(ArrayList::new));
+    }
+
+
+    public static List<UpdateAction<Product>> buildImageUpdateActions(
+        @Nonnull final Image oldImage,
+        @Nonnull final Image newImage) {
+        final Optional<UpdateAction<Product>> action = buildSetImageLabelUpdateAction(oldImage, newImage);
+        return action.map(Collections::singletonList)
+                     .orElseGet(Collections::emptyList);
+    }
+
+    public static Optional<UpdateAction<Product>> buildSetImageLabelUpdateAction(
+        @Nonnull final Image oldImage,
+        @Nonnull final Image newImage) {
+        final String newImageLabel = newImage.getLabel();
+        return buildUpdateAction(oldImage.getLabel(),
+            newImageLabel, () -> SetImageLabel.of(1, newImage.getUrl(), newImageLabel, true));
+    }
+
 
     /**
      * Compares an old {@link List} of {@link Image}s and a new one and returns a {@link List} of
