@@ -19,11 +19,6 @@ import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 
 public final class ProductTypeUpdateActionUtils {
-    private static final String PRODUCT_TYPE_CHANGE_NAME_EMPTY_NAME = "Cannot unset 'name' field of product type with "
-        + "id '%s'.";
-    private static final String PRODUCT_TYPE_CHANGE_DESCRIPTION_EMPTY_DESCRIPTION = "Cannot unset 'description' field "
-        +   "of product type with id '%s'.";
-
     /**
      * Compares the {@code name} values of a {@link ProductType} and a {@link ProductTypeDraft}
      * and returns an {@link Optional} of update action, which would contain the {@code "changeName"}
@@ -35,23 +30,15 @@ public final class ProductTypeUpdateActionUtils {
      *
      * @param oldProductType the product type that should be updated.
      * @param newProductType the product type draft which contains the new name.
-     * @param syncOptions    the sync syncOptions with which a custom callback function is called in case the parent
-     *                       is null.
      * @return optional containing update action or empty optional if names are identical.
      */
     @Nonnull
     public static Optional<UpdateAction<ProductType>> buildChangeNameAction(
         @Nonnull final ProductType oldProductType,
-        @Nonnull final ProductTypeDraft newProductType,
-        @Nonnull final ProductTypeSyncOptions syncOptions) {
+        @Nonnull final ProductTypeDraft newProductType) {
 
-        if (newProductType.getName() == null && oldProductType.getName() != null) {
-            syncOptions.applyWarningCallback(format(PRODUCT_TYPE_CHANGE_NAME_EMPTY_NAME, oldProductType.getId()));
-            return Optional.empty();
-        } else {
-            return buildUpdateAction(oldProductType.getName(), newProductType.getName(),
-                () -> ChangeName.of(newProductType.getName()));
-        }
+        return buildUpdateAction(oldProductType.getName(), newProductType.getName(),
+            () -> ChangeName.of(newProductType.getName()));
     }
 
     /**
@@ -66,26 +53,15 @@ public final class ProductTypeUpdateActionUtils {
      *
      * @param oldProductType the product type that should be updated.
      * @param newProductType the product type draft which contains the new description.
-     * @param syncOptions    the sync syncOptions with which a custom callback function is called in case the
-     *                       description is null.
      * @return optional containing update action or empty optional if descriptions are identical.
      */
     @Nonnull
     public static Optional<UpdateAction<ProductType>> buildChangeDescriptionAction(
         @Nonnull final ProductType oldProductType,
-        @Nonnull final ProductTypeDraft newProductType,
-        @Nonnull final ProductTypeSyncOptions syncOptions) {
+        @Nonnull final ProductTypeDraft newProductType) {
 
-        if (newProductType.getDescription() == null && oldProductType.getDescription() != null) {
-            syncOptions.applyWarningCallback(format(PRODUCT_TYPE_CHANGE_DESCRIPTION_EMPTY_DESCRIPTION,
-                oldProductType.getId()));
-            return Optional.empty();
-        } else {
-            return buildUpdateAction(oldProductType.getDescription(), newProductType.getDescription(),
-                () -> ChangeDescription.of(newProductType.getDescription()));
-        }
-
-
+        return buildUpdateAction(oldProductType.getDescription(), newProductType.getDescription(),
+            () -> ChangeDescription.of(newProductType.getDescription()));
     }
 
     /**
